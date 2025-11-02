@@ -1,14 +1,18 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import StatusMessage from './StatusMessage';
+import ProductList from './ProductList';
 
 export default function Catalog() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Fetch products once on mount
   useEffect(() => {
     let ignore = false;
+
     (async () => {
       try {
         setLoading(true);
@@ -22,11 +26,12 @@ export default function Catalog() {
         if (!ignore) setLoading(false);
       }
     })();
+
     return () => { ignore = true; };
   }, []);
 
   return (
-    <section className="rounded-lg border bg-white p-4">
+    <section className="grid gap-6">
       <StatusMessage
         loading={loading}
         error={error}
@@ -34,9 +39,7 @@ export default function Catalog() {
       />
 
       {!loading && !error && products.length > 0 && (
-        <p className="text-sm text-gray-700">
-          Loaded {products.length} products successfully!
-        </p>
+        <ProductList products={products} />
       )}
     </section>
   );
