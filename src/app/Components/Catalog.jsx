@@ -1,18 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import StatusMessage from './StatusMessage';
 import ProductList from './ProductList';
+import CategoryFilter from './CategoryFilter';
+import PriceFilter from './PriceFilter';
 
 export default function Catalog() {
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
 
-  // Fetch products once on mount
+  // Controlled filters
+  const [category, setCategory] = useState('All');
+  const [maxPrice, setMaxPrice] = useState('');
+
+  // Fetch products once
   useEffect(() => {
     let ignore = false;
-
     (async () => {
       try {
         setLoading(true);
@@ -26,20 +31,51 @@ export default function Catalog() {
         if (!ignore) setLoading(false);
       }
     })();
-
     return () => { ignore = true; };
   }, []);
 
+  // Category options
+  const categories = useMemo(() => {
+    const set = new Set(products.map(p => p.category));
+    return ['All', ...Array.from(set)];
+  }, [products]);
+
+  // Apply filters
+  const filtered = useMemo(() => {
+    return products.filter(p => {
+      const catOk   = category === 'All' || p.category === category;
+      const priceOk = !maxPrice || p.price <= Number(maxPrice);
+      return catOk && priceOk;
+    });
+  }, [products, category, maxPrice]);
+
   return (
     <section className="grid gap-6">
+      {/* Filters row */}
+      <div className="grid md:grid-cols-3 gap-4 items-start">
+        <div className="md:col-span-2 grid sm:grid-cols-2 gap-4">
+          <CategoryFilter
+            categories={categories}
+            value={category}
+            onChange={setCategory}
+          />
+          <PriceFilter
+            value={maxPrice}
+            onChange={setMaxPrice}
+          />
+        </div>
+      </div>
+
+      {/* Status messages */}
       <StatusMessage
         loading={loading}
         error={error}
-        isEmpty={!loading && !error && products.length === 0}
+        isEmpty={!loading && !error && filtered.length === 0}
       />
 
-      {!loading && !error && products.length > 0 && (
-        <ProductList products={products} />
+      {/* Product grid */}
+      {!loading && !error && filtered.length > 0 && (
+        <ProductList products={filtered} />
       )}
     </section>
   );
