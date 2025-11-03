@@ -33,8 +33,8 @@ export default function CartSummary({ itemCount, total, cart, onDecrement, onRes
         disabled={entries.length === 0}
         className={`w-full rounded-lg px-3 py-2 text-sm font-medium border
           ${entries.length === 0
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+            : 'bg-sky-600 text-white hover:bg-sky-700 border-sky-600'}`}
       >
         Reset cart
       </button>
