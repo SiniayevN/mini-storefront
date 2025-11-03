@@ -1,113 +1,122 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import StatusMessage from './StatusMessage';
 import ProductList from './ProductList';
 import CategoryFilter from './CategoryFilter';
 import PriceFilter from './PriceFilter';
 import CartSummary from './CartSummary';
+import StatusMessage from './StatusMessage';
 
 export default function Catalog() {
-  // data loading
+  // data + ui state
   const [products, setProducts] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // filters (controlled)
+  // filters
   const [category, setCategory] = useState('All');
   const [maxPrice, setMaxPrice] = useState('');
 
-  // cart: { [id]: { product, qty } }
+  // cart: { [productId]: qty }
   const [cart, setCart] = useState({});
 
-  // fetch once
+  // fetch products from API route
   useEffect(() => {
-    let ignore = false;
     (async () => {
       try {
-        setLoading(true);
-        const res = await fetch('/api/products', { cache: 'no-store' });
+        const res = await fetch('/api/products');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (!ignore) setProducts(data);
+        setProducts(data);
       } catch (e) {
-        if (!ignore) setError(e.message || 'Failed to load products');
+        setError(e.message || 'Failed to load products');
       } finally {
-        if (!ignore) setLoading(false);
+        setLoading(false);
       }
     })();
-    return () => { ignore = true; };
   }, []);
 
-  // categories
-  const categories = useMemo(() => ['All', ...new Set(products.map(p => p.category))], [products]);
+  // build category list for the dropdown (includes "All")
+  const categories = useMemo(() => {
+    const set = new Set(products.map((p) => p.category));
+    return ['All', ...Array.from(set).sort()];
+  }, [products]);
 
-  // apply filters
-  const filtered = useMemo(() => {
-    return products.filter(p => {
-      const catOk = category === 'All' || p.category === category;
-      const priceOk = !maxPrice || p.price <= Number(maxPrice);
-      return catOk && priceOk;
-    });
-  }, [products, category, maxPrice]);
+  // helper: qty currently in cart
+  const qtyInCart = (id) => cart[id] ?? 0;
 
-  // cart handlers
+  // cart actions (respect stock limits)
   const addToCart = (product) => {
-    if (product.stock <= 0) return;
-    setCart(prev => {
-      const item = prev[product.id];
-      return {
-        ...prev,
-        [product.id]: { product, qty: item ? item.qty + 1 : 1 }
-      };
+    setCart((prev) => {
+      const current = prev[product.id] ?? 0;
+      if (current >= product.stock) return prev; // don’t exceed stock
+      return { ...prev, [product.id]: current + 1 };
     });
   };
 
-  const decrement = (id) => {
-    setCart(prev => {
-      const item = prev[id];
-      if (!item) return prev;
-      const nextQty = item.qty - 1;
-      const { [id]: _, ...rest } = prev;
-      return nextQty > 0 ? { ...prev, [id]: { ...item, qty: nextQty } } : rest;
+  const decrement = (productId) => {
+    setCart((prev) => {
+      const current = prev[productId] ?? 0;
+      if (current <= 1) {
+        const { [productId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [productId]: current - 1 };
     });
   };
 
   const resetCart = () => setCart({});
 
-  // totals
-  const items = Object.values(cart);
-  const itemCount = items.reduce((s, it) => s + it.qty, 0);
-  const total = items.reduce((s, it) => s + it.qty * it.product.price, 0);
+  // filter products by category and max price
+  const filtered = useMemo(() => {
+    return products.filter((p) => {
+      const byCat = category === 'All' || p.category === category;
+      const byPrice = !maxPrice || p.price <= Number(maxPrice);
+      return byCat && byPrice;
+    });
+  }, [products, category, maxPrice]);
+
+  // map of prices for CartSummary
+  const priceMap = useMemo(() => {
+    const map = {};
+    for (const p of products) map[p.id] = p.price;
+    return map;
+  }, [products]);
+
+  const isEmpty = !loading && !error && filtered.length === 0;
 
   return (
-    <section className="grid gap-6">
-      {/* Filters + Cart */}
-      <div className="grid md:grid-cols-3 gap-4 items-start">
-        <div className="md:col-span-2 grid sm:grid-cols-2 gap-4">
-          <CategoryFilter categories={categories} value={category} onChange={setCategory} />
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+      {/* LEFT: filters + product list */}
+      <div>
+        <div className="mb-4 grid gap-4 sm:grid-cols-2">
+          <CategoryFilter
+            value={category}
+            onChange={setCategory}
+            categories={categories}
+          />
           <PriceFilter value={maxPrice} onChange={setMaxPrice} />
         </div>
-        <CartSummary
-          itemCount={itemCount}
-          total={total}
-          cart={cart}
-          onDecrement={decrement}
-          onReset={resetCart}
+
+        <StatusMessage loading={loading} error={error} isEmpty={isEmpty} />
+
+        <ProductList
+          products={filtered.map((p) => ({
+            ...p,
+            // show remaining stock after items already in cart
+            remaining: p.stock - qtyInCart(p.id),
+          }))}
+          onAdd={addToCart}
         />
       </div>
 
-      {/* Status */}
-      <StatusMessage
-        loading={loading}
-        error={error}
-        isEmpty={!loading && !error && filtered.length === 0}
+      {/* RIGHT: cart */}
+      <CartSummary
+        cart={cart}
+        onDecrement={decrement}
+        onReset={resetCart}
+        priceMap={priceMap}
       />
-
-      {/* Grid */}
-      {!loading && !error && filtered.length > 0 && (
-        <ProductList products={filtered} onAdd={addToCart} />
-      )}
-    </section>
+    </div>
   );
 }

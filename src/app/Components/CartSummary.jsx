@@ -1,7 +1,14 @@
 'use client';
 
-export default function CartSummary({ itemCount, total, cart, onDecrement, onReset }) {
-  const entries = Object.values(cart); // [{ product, qty }, ...]
+export default function CartSummary({ cart = {}, onDecrement, onReset, priceMap = {} }) {
+  const entries = Object.entries(cart); // [ [id, qty], ... ]
+  const itemCount = entries.reduce((sum, [, qty]) => sum + qty, 0);
+
+  // Safely compute total; if a price is missing, treat as 0
+  const total = entries.reduce((sum, [id, qty]) => {
+    const price = priceMap[id] ?? 0;
+    return sum + price * qty;
+  }, 0);
 
   return (
     <aside className="rounded-xl border bg-white p-4 shadow-sm">
@@ -11,30 +18,28 @@ export default function CartSummary({ itemCount, total, cart, onDecrement, onRes
 
       {entries.length > 0 ? (
         <ul className="space-y-2 mb-4">
-          {entries.map(({ product, qty }) => (
-            <li key={product.id} className="flex items-center justify-between text-sm">
-              <span>{product.name} × {qty}</span>
-              <button
-                onClick={() => onDecrement(product.id)}
-                className="rounded-md border px-2 py-1 hover:bg-gray-50"
-                title="Remove one"
-              >
-                −
-              </button>
+          {entries.map(([id, qty]) => (
+            <li key={id} className="flex items-center justify-between text-sm">
+              <span className="truncate">{id}</span>
+              <div className="flex items-center gap-2">
+                <span>x{qty}</span>
+                <button
+                  onClick={() => onDecrement(id)}
+                  className="rounded-md border px-2 py-1 text-xs"
+                >
+                  −1
+                </button>
+              </div>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-gray-400 mb-4">Your cart is empty.</p>
+        <p className="text-sm text-gray-500 mb-4">Your cart is empty.</p>
       )}
 
       <button
         onClick={onReset}
-        disabled={entries.length === 0}
-        className={`w-full rounded-lg px-3 py-2 text-sm font-medium border
-          ${entries.length === 0
-            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-            : 'bg-sky-600 text-white hover:bg-sky-700 border-sky-600'}`}
+        className="w-full rounded-md border px-3 py-2 text-sm"
       >
         Reset cart
       </button>
