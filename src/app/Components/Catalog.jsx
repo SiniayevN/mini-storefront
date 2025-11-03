@@ -36,7 +36,7 @@ export default function Catalog() {
     })();
   }, []);
 
-  // build category list for the dropdown (includes "All")
+  // category list for the dropdown (includes "All")
   const categories = useMemo(() => {
     const set = new Set(products.map((p) => p.category));
     return ['All', ...Array.from(set).sort()];
@@ -76,12 +76,14 @@ export default function Catalog() {
     });
   }, [products, category, maxPrice]);
 
-  // map of prices for CartSummary
-  const priceMap = useMemo(() => {
-    const map = {};
-    for (const p of products) map[p.id] = p.price;
-    return map;
-  }, [products]);
+  // product map for CartSummary: id -> { name, price }
+  const productMap = useMemo(
+    () =>
+      Object.fromEntries(
+        products.map((p) => [p.id, { name: p.name, price: p.price }])
+      ),
+    [products]
+  );
 
   const isEmpty = !loading && !error && filtered.length === 0;
 
@@ -115,7 +117,7 @@ export default function Catalog() {
         cart={cart}
         onDecrement={decrement}
         onReset={resetCart}
-        priceMap={priceMap}
+        productMap={productMap}
       />
     </div>
   );
